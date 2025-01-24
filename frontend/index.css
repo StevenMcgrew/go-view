@@ -1,0 +1,54 @@
+/* body {
+    background-color: gray;
+} */
+
+h3 {
+    color: purple;
+}
+
+div p {
+    color: red
+}
+
+@keyframes slide-in {
+    from {
+        transform: translateX(0%);
+    }
+
+    to {
+        transform: translateX(100%);
+    }
+}
+
+/* At the top level of your code */
+@media screen and (min-width: 900px) {
+    article {
+        padding: 1rem 3rem;
+    }
+}
+
+/* Nested within another conditional at-rule */
+@supports (display: flex) {
+    @media screen and (min-width: 900px) {
+        article {
+            display: flex;
+        }
+    }
+}
+
+@layer base, special;
+
+@layer special {
+  .item {
+    color: rebeccapurple;
+  }
+}
+
+@layer base {
+  .item {
+    color: green;
+    border: 5px solid green;
+    font-size: 1.3em;
+    padding: 0.5em;
+  }
+}

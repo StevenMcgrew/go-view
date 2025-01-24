@@ -12,6 +12,8 @@ build:
 # Run the application
 run:
 	@go run cmd/api/main.go
+runfront:
+	@go run cmd/gue/main.go
 
 # Test the application
 test:
@@ -40,4 +42,4 @@ watch:
             fi; \
         fi
 
-.PHONY: all build run test clean watch
+.PHONY: all build run runfront test clean watch
