@@ -3,9 +3,12 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
+	"strings"
 
-	"github.com/PuerkitoBio/goquery"
+	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 )
 
 // func ProcessFile(filename string) {
@@ -328,6 +331,62 @@ import (
 // 	}
 // }
 
+const (
+	alphanumeric = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+)
+
+func generateId() string {
+	b := make([]byte, 6)
+	b[0] = alphanumeric[rand.Intn(len(alphanumeric)-10)]
+	for i := 1; i < len(b); i++ {
+		b[i] = alphanumeric[rand.Intn(len(alphanumeric))]
+	}
+	return string(b)
+}
+
+func getScript(doc *html.Node) {
+	for node := range doc.Descendants() {
+		if node.Type == html.ElementNode &&
+			node.DataAtom == atom.Script {
+			html.Render(os.Stdout, node.FirstChild)
+			fmt.Println()
+			return
+		}
+	}
+}
+
+func processTemplate(doc *html.Node, compId string) {
+	for node := range doc.Descendants() {
+		if node.Type == html.ElementNode &&
+			node.DataAtom == atom.Template {
+			appendClassNames(node, compId)
+			for n := range node.Descendants() {
+				appendClassNames(n, compId)
+			}
+			html.Render(os.Stdout, node)
+			fmt.Println()
+			break
+		}
+	}
+}
+
+func appendClassNames(node *html.Node, compId string) {
+	for i, a := range node.Attr {
+		if a.Key == "class" {
+			classNames := strings.Fields(a.Val)
+			for i, cName := range classNames {
+				classNames[i] = cName + "-" + compId
+			}
+			classNames = append(classNames, compId)
+			node.Attr[i].Val = strings.Join(classNames, " ")
+			return
+		}
+	}
+
+	// "class" attribute not found, therefore add the compId scope class
+	node.Attr = append(node.Attr, html.Attribute{Key: "class", Val: compId})
+}
+
 func main() {
 	// Access the file
 	file, err := os.Open("ModalBox.html")
@@ -336,23 +395,34 @@ func main() {
 	}
 	defer file.Close()
 
-	// Create goquery.Document
-	doc, err := goquery.NewDocumentFromReader(file)
+	doc, err := html.Parse(file)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Error parsing HTML.")
 	}
 
-	var sel = &goquery.Selection{}
+	compId := generateId()
 
-	// Get script contents
+	// getScript(doc)
+
+	processTemplate(doc, compId)
+
+	// // Create goquery.Document
+	// doc, err := goquery.NewDocumentFromReader(file)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	// var sel = &goquery.Selection{}
+
+	// // Get script contents
 	// sel = doc.Find("script").First()
 	// fmt.Println(sel.Html())
 
-	// Get template contents
+	// // Get template contents
 	// sel = doc.Find("template").First()
 	// fmt.Println(sel.Html())
 
-	// Get style contents
-	sel = doc.Find("style").First()
-	fmt.Println(sel.Html())
+	// // Get style contents
+	// sel = doc.Find("style").First()
+	// fmt.Println(sel.Html())
 }
