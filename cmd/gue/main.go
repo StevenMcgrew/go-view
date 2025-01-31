@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"math/rand"
 	"os"
 	"strings"
 
+	"github.com/tdewolff/parse/css"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )
@@ -355,13 +357,26 @@ func getScript(doc *html.Node) {
 	}
 }
 
-func processTemplate(doc *html.Node, compId string) {
+func getStyle(doc *html.Node) string {
+	for node := range doc.Descendants() {
+		if node.Type == html.ElementNode &&
+			node.DataAtom == atom.Style {
+			var buf bytes.Buffer
+			html.Render(&buf, node.FirstChild)
+			str := buf.String()
+			return str
+		}
+	}
+	return ""
+}
+
+func processTemplate(doc *html.Node, scopeId string) {
 	for node := range doc.Descendants() {
 		if node.Type == html.ElementNode &&
 			node.DataAtom == atom.Template {
-			appendClassNames(node, compId)
+			appendClassNames(node, scopeId)
 			for n := range node.Descendants() {
-				appendClassNames(n, compId)
+				appendClassNames(n, scopeId)
 			}
 			html.Render(os.Stdout, node)
 			fmt.Println()
@@ -370,21 +385,70 @@ func processTemplate(doc *html.Node, compId string) {
 	}
 }
 
-func appendClassNames(node *html.Node, compId string) {
+func appendClassNames(node *html.Node, scopeId string) {
+	foundClassAttr := false
 	for i, a := range node.Attr {
 		if a.Key == "class" {
+			foundClassAttr = true
 			classNames := strings.Fields(a.Val)
 			for i, cName := range classNames {
-				classNames[i] = cName + "-" + compId
+				classNames[i] = cName + "-" + scopeId
 			}
-			classNames = append(classNames, compId)
+			classNames = append(classNames, scopeId)
 			node.Attr[i].Val = strings.Join(classNames, " ")
-			return
+		} else if a.Key == "id" {
+			node.Attr[i].Val = a.Val + "-" + scopeId
 		}
 	}
+	if !foundClassAttr {
+		node.Attr = append(node.Attr, html.Attribute{Key: "class", Val: scopeId})
+	}
+}
 
-	// "class" attribute not found, therefore add the compId scope class
-	node.Attr = append(node.Attr, html.Attribute{Key: "class", Val: compId})
+func processCss(doc *html.Node, scopeId string) {
+	styles := getStyle(doc)
+
+	l := css.NewLexer(strings.NewReader(styles))
+	var output string
+	inBraces := false
+	isClass := false
+	for {
+		tt, bytes := l.Next()
+		data := string(bytes)
+		if tt == css.ErrorToken {
+			break
+		}
+
+		switch tt {
+		case css.LeftBraceToken:
+			inBraces = true
+			output += data
+		case css.RightBraceToken:
+			inBraces = false
+			output += data
+		case css.HashToken:
+			output += data + "." + scopeId
+		case css.DelimToken:
+			if !inBraces && data == "." {
+				isClass = true
+			}
+			output += data
+		case css.IdentToken:
+			if !inBraces {
+				if isClass {
+					output += data + "-" + scopeId
+					isClass = false
+				} else {
+					output += data + "." + scopeId
+				}
+			} else {
+				output += data
+			}
+		default:
+			output += data
+		}
+	}
+	fmt.Println(output)
 }
 
 func main() {
@@ -400,29 +464,12 @@ func main() {
 		log.Fatal("Error parsing HTML.")
 	}
 
-	compId := generateId()
+	// scopeId := generateId()
 
-	// getScript(doc)
+	getScript(doc)
 
-	processTemplate(doc, compId)
+	// processTemplate(doc, scopeId)
 
-	// // Create goquery.Document
-	// doc, err := goquery.NewDocumentFromReader(file)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	// processCss(doc, scopeId)
 
-	// var sel = &goquery.Selection{}
-
-	// // Get script contents
-	// sel = doc.Find("script").First()
-	// fmt.Println(sel.Html())
-
-	// // Get template contents
-	// sel = doc.Find("template").First()
-	// fmt.Println(sel.Html())
-
-	// // Get style contents
-	// sel = doc.Find("style").First()
-	// fmt.Println(sel.Html())
 }

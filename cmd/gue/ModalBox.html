@@ -29,7 +29,7 @@
     </script>
     
     <template>
-        <div class="modal-header">
+        <div id="myDiv" class="modal-header">
             <h3 class="title">TITLE</h3>
             <button>x</button>
         </div>
@@ -41,7 +41,11 @@
     </template>
     
     <style>
-    button {
+    .myclass + p {
         color: red;
+    }
+
+    #myid h3 {
+        width: auto;
     }
     </style>
