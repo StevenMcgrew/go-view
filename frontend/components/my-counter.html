@@ -1,0 +1,48 @@
+<script>
+
+    let heading = {
+        value: String(""),
+        onChange(comp, newValue) {
+            comp.q("h3").textContent = newValue;
+        }
+    };
+
+    let count = {
+        value: Number(0),
+        onChange(comp, newValue) {
+            comp.q("button").textContent = `Count is: ${newValue}`;
+        }
+    };
+
+    function onMount(comp) {
+        // Event Handlers
+        comp.q("button").onclick = (e) => {
+            comp.count++;
+        };
+    }
+
+</script>
+
+<template>
+    <h3></h3>
+    <div>
+        <button></button>
+    </div>
+</template>
+
+<style>
+    comp {
+        display: block;
+        background-color: green;
+        width: 100px;
+        height: 100px;
+    }
+
+    h3 {
+        color: white;
+    }
+    button {
+        text-transform: uppercase;
+        padding: 10px;
+    }
+</style>
