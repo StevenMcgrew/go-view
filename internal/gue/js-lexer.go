@@ -1,21 +1,40 @@
 package gue
 
+import (
+	"fmt"
+	"log"
+	"unicode"
+)
+
 // Token Types
 const (
-	Illegal   = "ILLEGAL"
-	Eof       = "EOF"
-	Ident     = "IDENT"
-	Int       = "INT"
-	Equal     = "="
-	Plus      = "+"
-	Comma     = ","
-	Semicolon = ";"
-	LParen    = "("
-	RParen    = ")"
-	LSquirly  = "{"
-	RSquirly  = "}"
-	Function  = "FUNCTION"
-	Let       = "LET"
+	NotSpecified   = "NOT_SPECIFIED"   //
+	Eof            = "EOF"             // \x00
+	Identifier     = "IDENTIFIER"      //
+	Number         = "NUMBER"          //
+	Quote          = "QUOTE"           // " ' `
+	Boolean        = "BOOLEAN"         // true false
+	Whitespace     = "WHITESPACE"      //
+	LineComment    = "LINE_COMMENT"    // //
+	BlockComment   = "BLOCK_COMMENT"   // /*
+	VarDeclarer    = "VAR_DECLARER"    // var let const
+	FuncDeclarer   = "FUNC_DECLARER"   // function
+	Setter         = "SETTER"          // =
+	Equality       = "EQUALITY"        // == ===
+	Colon          = "COLON"           // :
+	Semicolon      = "SEMICOLON"       // ;
+	Comma          = "COMMA"           // ,
+	Dot            = "DOT"             // .
+	Plus           = "PLUS"            // +
+	Minus          = "MINUS"           // -
+	Divide         = "DIVIDE"          // /
+	MultipLy       = "MULTIPLY"        // *
+	OpeningParen   = "OPENING_PAREN"   // (
+	ClosingParen   = "CLOSING_PAREN"   // )
+	OpeningBrace   = "OPENING_BRACE"   // {
+	ClosingBrace   = "CLOSING_BRACE"   // }
+	OpeningBracket = "OPENING_BRACKET" // [
+	ClosingBracket = "CLOSING_BRACKET" // ]
 )
 
 type Token struct {
@@ -23,141 +42,247 @@ type Token struct {
 	Value string
 }
 
-func CreateToken(_type string, literal string) Token {
-	return Token{Type: _type, Value: literal}
-}
-
-const _0 = int('0')
-const _9 = int('9')
-
-const a = int('a')
-const z = int('z')
-
-const A = int('A')
-const Z = int('Z')
-
-const __ = int('_')
-
-func isLetter(character rune) bool {
-	var char = int(character)
-	return a <= char && z >= char ||
-		A <= char && Z >= char ||
-		char == __
-}
-
-func isNumber(character rune) bool {
-	var char = int(character)
-	return _0 <= char && _9 >= char
-}
-
-var Keyword = map[string]Token{
-	"fn":  CreateToken(Function, "fn"),
-	"let": CreateToken(Let, "let"),
-}
-
 type Tokenizer struct {
 	position     int
 	readPosition int
-	ch           rune
+	char         rune
 	input        string
 }
 
 func NewTokenizer(input string) Tokenizer {
-	var tokenizer = Tokenizer{
+	var t = Tokenizer{
 		position:     0,
 		readPosition: 0,
 		input:        input,
 	}
-	tokenizer.readChar()
-	return tokenizer
+	t.readChar()
+	return t
 }
 
-func (tokenizer *Tokenizer) GetNextToken() Token {
-	tokenizer.skipWhitespace()
+func (t *Tokenizer) GetNextToken() Token {
 
-	var tok Token
-	var tokNil bool = true
-	switch tokenizer.ch {
-	case '{':
-		tok = CreateToken(LSquirly, string(tokenizer.ch))
-		tokNil = false
-	case '}':
-		tok = CreateToken(RSquirly, string(tokenizer.ch))
-		tokNil = false
-	case '(':
-		tok = CreateToken(LParen, string(tokenizer.ch))
-		tokNil = false
-	case ')':
-		tok = CreateToken(RParen, string(tokenizer.ch))
-		tokNil = false
-	case ',':
-		tok = CreateToken(Comma, string(tokenizer.ch))
-		tokNil = false
-	case ';':
-		tok = CreateToken(Semicolon, string(tokenizer.ch))
-		tokNil = false
-	case '+':
-		tok = CreateToken(Plus, string(tokenizer.ch))
-		tokNil = false
-	case '=':
-		tok = CreateToken(Equal, string(tokenizer.ch))
-		tokNil = false
-	case '\x00':
-		tok = CreateToken(Eof, "eof")
-		tokNil = false
+	if unicode.IsSpace(t.char) {
+		return Token{Whitespace, t.readWhitespace()}
 	}
 
-	if isLetter((tokenizer.ch)) {
-		var ident = tokenizer.readIdent()
-		var keyword, exists = Keyword[ident]
+	if isStartOfWord((t.char)) {
+		identifier := t.readIdentifier()
+
+		token, exists := KeywordMap[identifier]
 		if exists {
-			return keyword
-		} else {
-			return CreateToken(Ident, ident)
+			// t.readChar()
+			return token
 		}
-	} else if isNumber((tokenizer.ch)) {
-		return CreateToken(Int, tokenizer.readInt())
-	} else if tokNil {
-		return CreateToken(Illegal, string(tokenizer.ch))
+
+		return Token{Identifier, identifier}
 	}
 
-	tokenizer.readChar()
-	return tok
+	if isDigit((t.char)) {
+		return Token{Number, t.readNumber()}
+	}
+
+	if isQuote(t.char) {
+		return Token{Quote, t.readQuote()}
+	}
+
+	var token Token
+	switch t.char {
+	case '[':
+		token = Token{OpeningBracket, string(t.char)}
+	case ']':
+		token = Token{ClosingBracket, string(t.char)}
+	case '{':
+		token = Token{OpeningBrace, string(t.char)}
+	case '}':
+		token = Token{ClosingBrace, string(t.char)}
+	case '(':
+		token = Token{OpeningParen, string(t.char)}
+	case ')':
+		token = Token{ClosingParen, string(t.char)}
+	case ',':
+		token = Token{Comma, string(t.char)}
+	case ';':
+		token = Token{Semicolon, string(t.char)}
+	case ':':
+		token = Token{Colon, string(t.char)}
+	case '*':
+		token = Token{MultipLy, string(t.char)}
+	case '=':
+		if t.nextChar() == '=' {
+			token = Token{Equality, t.readEquality()}
+		} else {
+			token = Token{Setter, string(t.char)}
+		}
+	case '/':
+		next := t.nextChar()
+		if next == '/' {
+			token = Token{LineComment, t.readLineComment()}
+		} else if next == '*' {
+			token = Token{BlockComment, t.readBlockComment()}
+		} else {
+			token = Token{Divide, string(t.char)}
+		}
+	case '.':
+		if isDigit(t.nextChar()) {
+			token = Token{Number, t.readNumber()}
+		} else {
+			token = Token{Dot, string(t.char)}
+		}
+	case '+':
+		if isDigit(t.nextChar()) {
+			token = Token{Number, t.readNumber()}
+		} else {
+			token = Token{Plus, string(t.char)}
+		}
+	case '-':
+		if isDigit(t.nextChar()) {
+			token = Token{Number, t.readNumber()}
+		} else {
+			token = Token{Minus, string(t.char)}
+		}
+	case '\x00':
+		token = Token{Eof, "eof"}
+		return token
+	default:
+		token = Token{NotSpecified, string(t.char)}
+	}
+
+	t.readChar()
+	return token
 }
 
-func (tokenizer *Tokenizer) readChar() {
-	if tokenizer.readPosition >= len(tokenizer.input) {
-		tokenizer.ch = '\x00'
-	} else {
-		tokenizer.ch = rune(tokenizer.input[tokenizer.readPosition])
-	}
-
-	tokenizer.position = tokenizer.readPosition
-	tokenizer.readPosition++
+func (t *Tokenizer) nextChar() rune {
+	return rune(t.input[t.readPosition])
 }
 
-func (tokenizer *Tokenizer) skipWhitespace() {
-	for tokenizer.ch == ' ' || tokenizer.ch == '\t' || tokenizer.ch == '\n' || tokenizer.ch == '\r' {
-		tokenizer.readChar()
-	}
+var KeywordMap = map[string]Token{
+	"true":     {Boolean, "true"},
+	"false":    {Boolean, "false"},
+	"var":      {VarDeclarer, "var"},
+	"let":      {VarDeclarer, "let"},
+	"const":    {VarDeclarer, "const"},
+	"function": {FuncDeclarer, "function"},
 }
 
-func (tokenizer *Tokenizer) readIdent() string {
-	var position = tokenizer.position
-
-	for isLetter(tokenizer.ch) {
-		tokenizer.readChar()
-	}
-
-	return tokenizer.input[position:tokenizer.position]
+func isStartOfWord(r rune) bool {
+	return r >= 'a' && r <= 'z' ||
+		r >= 'A' && r <= 'Z' ||
+		r == '_' || r == '$'
 }
 
-func (tokenizer *Tokenizer) readInt() string {
-	var position = tokenizer.position
+func isIdentifierChar(r rune) bool {
+	return r >= 'a' && r <= 'z' ||
+		r >= 'A' && r <= 'Z' ||
+		r >= '0' && r <= '9' ||
+		r == '_' || r == '$'
+}
 
-	for isNumber(tokenizer.ch) {
-		tokenizer.readChar()
+func isDigit(r rune) bool {
+	return r >= '0' && r <= '9'
+}
+
+func isQuote(r rune) bool {
+	return r == '"' || r == '\'' || r == '`'
+}
+
+func (t *Tokenizer) readChar() {
+	if t.readPosition >= len(t.input) {
+		t.char = '\x00'
+		t.position = t.readPosition
+		return
 	}
 
-	return tokenizer.input[position:tokenizer.position]
+	t.char = rune(t.input[t.readPosition])
+	t.position = t.readPosition
+	t.readPosition++
+}
+
+func (t *Tokenizer) readWhitespace() string {
+	start := t.position
+	t.readChar()
+
+	for unicode.IsSpace(t.char) {
+		t.readChar()
+	}
+
+	return t.input[start:t.position]
+}
+
+func (t *Tokenizer) readIdentifier() string {
+	start := t.position
+	t.readChar()
+
+	for isIdentifierChar(t.char) {
+		t.readChar()
+	}
+
+	return t.input[start:t.position]
+}
+
+func (t *Tokenizer) readNumber() string {
+	start := t.position
+	t.readChar()
+
+	for !unicode.IsSpace(t.char) {
+		if t.char == '\x00' {
+			break
+		}
+		t.readChar()
+	}
+
+	return t.input[start:t.position]
+}
+
+func (t *Tokenizer) readQuote() string {
+	start := t.position
+	quoteMark := t.char
+	fmt.Println("quoteMark:", string(quoteMark))
+
+	t.readChar()
+
+	num := 1
+	for t.char != quoteMark {
+		fmt.Println("LOOP:", num)
+		fmt.Println("t.char:", string(t.char))
+		t.readChar()
+		num++
+		if num > 3 {
+			log.Fatal("force quit")
+		}
+	}
+	t.readChar()
+	return t.input[start:t.position]
+}
+
+func (t *Tokenizer) readLineComment() string {
+	start := t.position
+	t.readChar()
+
+	for t.char != '\n' && t.char != '\r' {
+		t.readChar()
+	}
+
+	return t.input[start:t.position]
+}
+
+func (t *Tokenizer) readBlockComment() string {
+	start := t.position
+	t.readChar()
+
+	for string(t.char)+string(t.input[t.readPosition]) != "*/" {
+		t.readChar()
+	}
+
+	return t.input[start:t.position]
+}
+
+func (t *Tokenizer) readEquality() string {
+	start := t.position
+	t.readChar()
+
+	for t.char == '=' {
+		t.readChar()
+	}
+
+	return t.input[start:t.position]
 }

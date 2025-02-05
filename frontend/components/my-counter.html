@@ -1,14 +1,14 @@
 <script>
 
     let heading = {
-        value: String(""),
+        value: "",
         onChange(comp, newValue) {
             comp.q("h3").textContent = newValue;
         }
     };
 
     let count = {
-        value: Number(0),
+        value: 0,
         onChange(comp, newValue) {
             comp.q("button").textContent = `Count is: ${newValue}`;
         }
